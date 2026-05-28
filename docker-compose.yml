@@ -1,5 +1,7 @@
+version: '3.8'
+
 services:
-  # Base de données PostgreSQL
+  # 1. Base de données PostgreSQL
   postgres_db:
     image: postgres:15-alpine
     container_name: fraud_postgres
@@ -11,8 +13,13 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d tfc_fraud_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # Broker Apache Kafka
+  # 2. Broker Apache Kafka (Mode KRaft sans Zookeeper)
   kafka_broker:
     image: apache/kafka:latest
     container_name: fraud_kafka
@@ -21,12 +28,77 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENERS: INSIDE://:9094,OUTSIDE://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka_broker:9094,OUTSIDE://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 3. API Gateway (FastAPI)
+  api_gateway:
+    build:
+      context: .
+      dockerfile: ./api_gateway/Dockerfile
+    container_name: fraud_api_gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=postgres_db
+      - DB_NAME=tfc_fraud_db
+      - DB_USER=admin
+      - DB_PASS=MonSuperPassword2026
+      - KAFKA_BROKER=kafka_broker:9094
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      kafka_broker:
+        condition: service_healthy
+
+  # 4. Worker de Traitement et Inférence IA (ML Consumer)
+  ml_consumer:
+    build:
+      context: .
+      dockerfile: ./ml_consumer/Dockerfile
+    container_name: fraud_ml_consumer
+    environment:
+      - DB_HOST=postgres_db
+      - DB_NAME=tfc_fraud_db
+      - DB_USER=admin
+      - DB_PASS=MonSuperPassword2026
+      - KAFKA_BROKER=kafka_broker:9094
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      kafka_broker:
+        condition: service_healthy
+
+  # 5. Application de Supervision (Streamlit)
+  dashboard:
+    build:
+      context: .
+      dockerfile: ./dashboard/Dockerfile
+    container_name: fraud_dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      - DB_HOST=postgres_db
+      - DB_NAME=tfc_fraud_db
+      - DB_USER=admin
+      - DB_PASS=MonSuperPassword2026
+      - KAFKA_BROKER=kafka_broker:9094
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      kafka_broker:
+        condition: service_healthy
 
 volumes:
   postgres_data:
