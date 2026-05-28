@@ -3,6 +3,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
 import joblib
+import os
 
 FICHIER_CSV = "creditcard.csv"
 
@@ -49,6 +50,10 @@ print("- Si les variables temporelles/profils dominent (ex: V17, V14, Time) : L'
 print("- Si la variable 'Amount' montre un ecart type fort : L'IA discrimine le 'Card Testing' (montants infimes) des 'Achats Flash' (gros montants).")
 # ───────────────────────────────────────────────────────────────────────────────────
 
-print("\n[DATA SCIENCE] 6. Exportation du modele...")
-joblib.dump(modele_rf, 'mon_modele_ia.joblib')
-print("[DATA SCIENCE] Le fichier 'mon_modele_ia.joblib' a ete mis a jour a la racine.")
+print("\n[DATA SCIENCE] 6. Exportation du modele vers le dossier ml_consumer...")
+# Securisation : On s'assure que le dossier ml_consumer existe avant d'exporter
+os.makedirs('ml_consumer', exist_ok=True)
+
+# Exportation directe au bon endroit pour le worker
+joblib.dump(modele_rf, 'ml_consumer/mon_modele_ia.joblib')
+print("[DATA SCIENCE] Le fichier 'mon_modele_ia.joblib' a ete genere avec succes dans ml_consumer/.")
