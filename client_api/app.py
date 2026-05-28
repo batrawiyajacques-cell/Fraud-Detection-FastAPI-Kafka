@@ -15,7 +15,7 @@ class NotificationPayload(BaseModel):
 
 @app.post("/client/webhook", status_code=status.HTTP_200_OK)
 async def recevoir_alerte_fraude(notification: NotificationPayload):
-    print(f"\n🔔 [NOTIFICATION RECUE] Transaction : {notification.id_trans}")
+    print(f"\n [NOTIFICATION RECUE] Transaction : {notification.id_trans}")
     print(f"➔ Score de risque calculé par l'IA : {notification.score_valeur * 100:.2f}%")
     print(f"➔ Type de menace détecté : {notification.type_menace}")
     
