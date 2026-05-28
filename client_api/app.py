@@ -3,22 +3,28 @@ from pydantic import BaseModel
 
 app = FastAPI(title="API Reception Client - Banque Partenaire (TFC)")
 
-# Classe de validation corrigee sans aucune erreur de syntaxe
+# Classe de validation mise a jour pour accepter l'integralite du payload du worker
 class NotificationPayload(BaseModel):
     id_score: list | int | None
     id_trans: str
     score_valeur: float
     verdict: bool
+    type_menace: str                    # <-- Ajouté pour correspondre au worker
+    action_requise: str                 # <-- Ajouté pour correspondre au worker
     message: str | None = None
 
 @app.post("/client/webhook", status_code=status.HTTP_200_OK)
 async def recevoir_alerte_fraude(notification: NotificationPayload):
-    # Ce point de contact simule la reception des alertes chez le client
-    if notification.verdict:
-        print(f"\n [ALERTE BANQUE CLIENT] RETRAIT/ACHAT SUSPECT DETECTE : {notification.id_trans}")
-        print(f"➔ Score de risque calcule par l'IA : {notification.score_valeur * 100:.2f}%")
-        print("➔ Action automatique : Blocage immediat de la carte de credit.\n")
-    else:
-        print(f" [INFO BANQUE CLIENT] Transaction legitime acceptee : {notification.id_trans} (Risque : {notification.score_valeur * 100:.2f}%)")
+    print(f"\n🔔 [NOTIFICATION RECUE] Transaction : {notification.id_trans}")
+    print(f"➔ Score de risque calculé par l'IA : {notification.score_valeur * 100:.2f}%")
+    print(f"➔ Type de menace détecté : {notification.type_menace}")
     
-    return {"status": "SUCCESS", "detail": "Alerte recue et traitee"}
+    # Arbre de décision applicatif côté client
+    if notification.action_requise == "BLOCK":
+        print(" ACTION AUTOMATIQUE : Blocage immédiat de la carte de crédit et gel des fonds.\n")
+    elif notification.action_requise == "TRIGGER_OTP":
+        print(" ACTION REQUISE : Suspension temporaire. Envoi immédiat d'un code OTP par SMS au client.\n")
+    else:
+        print(" INFO : Transaction légitime validée.\n")
+    
+    return {"status": "SUCCESS", "detail": f"Action {notification.action_requise} exécutée avec succès"}
