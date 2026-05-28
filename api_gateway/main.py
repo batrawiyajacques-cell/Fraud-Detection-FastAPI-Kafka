@@ -16,7 +16,7 @@ app = FastAPI(title="API Gateway Sécurisée - Credit Card Fraud TFC")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "tfc_fraud_db")
 DB_USER = os.getenv("DB_USER", "admin")
-DB_PASS = os.getenv("DB_PASS")  # Chargé depuis le fichier .env
+DB_PASS = os.getenv("DB_PASS", "MonSuperPassword2026")  # Chargé proprement depuis le .env
 
 DB_URI = f"dbname={DB_NAME} user={DB_USER} password={DB_PASS} host={DB_HOST} port=5432"
 
@@ -37,9 +37,9 @@ except Exception as e:
 
 # Schéma Pydantic pour la validation stricte des données d'entrée (MLD)
 class CreditCardPayload(BaseModel):
-    id_trans: str = Field(..., example="TX_CC_001")
-    tx_time: float = Field(..., example=0.0)
-    amount: float = Field(..., gt=0, example=149.99)
+    id_trans: str = Field(..., json_schema_extra={"example": "TX_CC_001"})
+    tx_time: float = Field(..., json_schema_extra={"example": 0.0})
+    amount: float = Field(..., gt=0, json_schema_extra={"example": 149.99})
     v1: float; v2: float; v3: float; v4: float; v5: float
     v6: float; v7: float; v8: float; v9: float; v10: float
     v11: float; v12: float; v13: float; v14: float; v15: float
@@ -47,9 +47,9 @@ class CreditCardPayload(BaseModel):
     v21: float; v22: float; v23: float; v24: float; v25: float
     v26: float; v27: float; v28: float
 
-def verifier_authentification_et_role(api_key: str) -> str:
+def verifier_authentification_et_role(api_key: str):
     """
-    Vérifie la clé API dans PostgreSQL et retourne le rôle du client (QoS).
+    Vérifie la clé API dans PostgreSQL et retourne le tuple (id_client, role).
     Les connexions et curseurs sont fermés explicitement pour éviter les fuites de ressources.
     """
     conn = None
@@ -59,7 +59,7 @@ def verifier_authentification_et_role(api_key: str) -> str:
         cursor = conn.cursor()
         
         # Requête paramétrée pour bloquer les injections SQL
-        cursor.execute("SELECT role FROM UTILISATEUR WHERE api_key = %s;", (api_key,))
+        cursor.execute("SELECT id_client, role FROM UTILISATEUR WHERE api_key = %s;", (api_key,))
         result = cursor.fetchone()
         
         if not result:
@@ -67,7 +67,7 @@ def verifier_authentification_et_role(api_key: str) -> str:
                 status_code=status.HTTP_401_UNAUTHORIZED, 
                 detail="Clé API invalide ou accès refusé."
             )
-        return result[0]
+        return result[0], result[1]  # Retourne (id_client, role)
         
     except psycopg2.DatabaseError as e:
         print(f"[DB ERROR] Erreur lors de la vérification : {e}")
@@ -76,7 +76,6 @@ def verifier_authentification_et_role(api_key: str) -> str:
             detail="Une erreur interne est survenue lors de l'authentification."
         )
     finally:
-        # Sécurité : On s'assure de libérer les connexions dans tous les scénarios
         if cursor:
             cursor.close()
         if conn:
@@ -88,10 +87,10 @@ async def recevoir_transaction(transaction: CreditCardPayload, api_key: str = Se
     Point de terminaison principal (Endpoint) pour recevoir les transactions des banques.
     Identifie le rôle du partenaire et aiguille le payload vers le bon Topic Kafka.
     """
-    # 1. Authentification et récupération du rôle (Standard ou Premium)
-    role_client = verifier_authentification_et_role(api_key)
+    # 1. Authentification dynamique (Récupération de l'ID réel et du rôle)
+    id_client, role_client = verifier_authentification_et_role(api_key)
     
-    # 2. Routage dynamique basé sur la classe de service
+    # 2. Routage dynamique basé sur la classe de service (QoS)
     topic_destination = "Topic_Premium" if role_client == "Premium" else "Topic_Standard"
     
     # 3. Validation de la disponibilité de Kafka avant l'envoi
@@ -102,13 +101,13 @@ async def recevoir_transaction(transaction: CreditCardPayload, api_key: str = Se
         )
         
     try:
-        # 4. Préparation et enrichissement du payload
+        # 4. Préparation et enrichissement dynamique du payload
         payload = transaction.model_dump()
-        payload["id_client"] = 1 if role_client == "Premium" else 2
+        payload["id_client"] = id_client  # <-- Corrigé : ID dynamique provenant directement de la BDD !
         
         # 5. Envoi asynchrone dans le bus de messages
         producer.send(topic_destination, value=payload)
-        producer.flush() # Force la transmission immédiate
+        producer.flush()  # Force la transmission immédiate
         
     except Exception as e:
         print(f"[KAFKA PUSH ERROR] Échec d'envoi de l'événement : {e}")
