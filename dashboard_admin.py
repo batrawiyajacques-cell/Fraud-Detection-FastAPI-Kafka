@@ -3,12 +3,21 @@ import pandas as pd
 import psycopg2
 import secrets  # Module de sécurité pour la création de clés cryptographiques
 import io       # Pour la gestion du tampon mémoire Excel
+import os       # REQUIS : Pour la détection dynamique de l'environnement Docker
 from kafka import KafkaAdminClient
 from streamlit_autorefresh import st_autorefresh  # Import de l'auto-rafraîchissement
 
-DB_URI = "dbname=tfc_fraud_db user=admin password=MonSuperPassword2026 host=localhost port=5432"
+# ==========================================
+# CONFIGURATION DYNAMIQUE DES HÔTES DOCKER / LOCAL
+# ==========================================
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_NAME = os.getenv("DB_NAME", "tfc_fraud_db")
+DB_USER = os.getenv("DB_USER", "admin")
+DB_PASS = os.getenv("DB_PASS", "MonSuperPassword2026")
 
-# Configuration esthétique globale (Titre épuré et mise en page large)
+DB_URI = f"dbname={DB_NAME} user={DB_USER} password={DB_PASS} host={DB_HOST} port=5432"
+
+# Configuration esthetique globale (Titre épuré et mise en page large)
 st.set_page_config(page_title="Supervision Anti-Fraude", layout="wide", page_icon="🛡️")
 
 # ==========================================
@@ -271,7 +280,9 @@ with tab2:
 with tab3:
     st.subheader("Surveillance du Pipeline Événementiel")
     try:
-        admin = KafkaAdminClient(bootstrap_servers=['localhost:9092'])
+        # CORRECTION : Résolution dynamique de l'adresse du broker Kafka de l'infrastructure Docker
+        kafka_server = os.getenv("KAFKA_BROKER", "localhost:9092")
+        admin = KafkaAdminClient(bootstrap_servers=[kafka_server])
         st.success("Bus Événementiel Apache Kafka : CONNECTÉ (En Ligne)")
         st.write("Canaux (Topics) détectés dans l'infrastructure :", admin.list_topics())
     except:
