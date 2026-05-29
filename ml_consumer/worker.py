@@ -4,16 +4,26 @@ import requests
 import psycopg2
 import joblib
 import pandas as pd
+import os
 from kafka import KafkaConsumer
 
-KAFKA_BOOTSTRAP_SERVERS = ['localhost:9092']
+# --- CONFIGURATION RÉSEAU DOCKER DYNAMIQUE ---
+KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
+KAFKA_BOOTSTRAP_SERVERS = [KAFKA_BROKER]
 KAFKA_TOPICS = ['Topic_Premium', 'Topic_Standard']
-DB_URI = "dbname=tfc_fraud_db user=admin password=MonSuperPassword2026 host=localhost port=5432"
+
+# Extraction des variables d'environnement de la base de données
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_NAME = os.getenv("DB_NAME", "tfc_fraud_db")
+DB_USER = os.getenv("DB_USER", "admin")
+DB_PASS = os.getenv("DB_PASS", "MonSuperPassword2026")
+
+DB_URI = f"dbname={DB_NAME} user={DB_USER} password={DB_PASS} host={DB_HOST} port=5432"
 
 # SEUILS LOGIQUES APPLICATIFS (Gestion de la Zone Grise)
 SEUIL_CRITIQUE_FRAUDE = 0.75  # Au-dessus : Bloqué direct (Achat Flash / Vitesse Impossible)
 SEUIL_ZONE_GRISE = 0.40       # Entre 0.40 et 0.75 : Zone suspecte nécessitant un OTP/SMS
-URL_NOTIFICATION_CLIENT = "http://localhost:8080/client/webhook"
+URL_NOTIFICATION_CLIENT = "http://client_webhook:8001/client/webhook" # Redirection vers le bon webhook Docker
 
 print("[ML-CONSUMER] Chargement du VRAI modele Random Forest (Credit Card)...")
 try:

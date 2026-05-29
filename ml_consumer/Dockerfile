@@ -5,12 +5,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# On force Python à s'exécuter à l'emplacement des scripts du consommateur IA
+WORKDIR /app/ml_consumer
 
-COPY requirements.txt .
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-RUN pip install --no-cache-dir -r requirements.txt
+# Copie de vos scripts et du fichier .joblib dans le dossier courant
+COPY ./ml_consumer/ .
 
-COPY ./ml_consumer/ /app/ml_consumer/
-
-CMD ["python", "-m", "ml_consumer.main"]
+# Démarrage direct de votre worker IA
+CMD ["python", "worker.py"]

@@ -109,13 +109,15 @@ services:
       - "8001:8001"
     restart: always
 
-  # 7. Robot Simulateur de Flux Mixte (Corrigé !)
+  # 7. Robot Simulateur de Flux Mixte (Variable d'environnement ajoutée)
   simulateur_flux:
     build:
       context: .
-      dockerfile: ./simulateur_flux/Dockerfile
+      dockerfile: Dockerfile.lanceur
     container_name: fraud_simulator
     restart: on-failure
+    environment:
+      - URL_API=http://api_gateway:8000/v1/transactions
     depends_on:
       api_gateway:
         condition: service_started
