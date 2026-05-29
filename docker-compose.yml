@@ -99,7 +99,7 @@ services:
       kafka_broker:
         condition: service_healthy
 
-  # 6. Webhook de Réception Banque Partenaire (Nouveau service !)
+  # 6. Webhook de Réception Banque Partenaire
   client_webhook:
     build:
       context: .
@@ -108,6 +108,17 @@ services:
     ports:
       - "8001:8001"
     restart: always
+
+  # 7. Robot Simulateur de Flux Mixte (Nouveau !)
+  simulateur_flux:
+    build:
+      context: .
+      dockerfile: Dockerfile.launcher
+    container_name: fraud_simulator
+    restart: on-failure
+    depends_on:
+      api_gateway:
+        condition: service_started
 
 volumes:
   postgres_data:
