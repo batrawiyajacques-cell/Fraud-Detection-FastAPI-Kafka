@@ -99,5 +99,15 @@ services:
       kafka_broker:
         condition: service_healthy
 
+  # 6. Webhook de Réception Banque Partenaire (Nouveau service !)
+  client_webhook:
+    build:
+      context: .
+      dockerfile: ./client_api/Dockerfile
+    container_name: fraud_client_webhook
+    ports:
+      - "8001:8001"
+    restart: always
+
 volumes:
   postgres_data:
