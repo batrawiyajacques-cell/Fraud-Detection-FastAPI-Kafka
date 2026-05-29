@@ -3,12 +3,13 @@ import pandas as pd
 import psycopg2
 import secrets  # Module de sécurité pour la création de clés cryptographiques
 import io       # Pour la gestion du tampon mémoire Excel
-import os       # REQUIS : Pour permettre à Docker de communiquer ses variables réseau
+import os       # REQUIS : Pour la détection dynamique de l'environnement Docker
 from kafka import KafkaAdminClient
 from streamlit_autorefresh import st_autorefresh  # Import de l'auto-rafraîchissement
 
-# --- INTERCONNEXION DYNAMIQUE (DOCKER / LOCAL) ---
-# Si le conteneur tourne sous Docker, il lira 'postgres_db'. Sinon, il se rabat sur 'localhost'
+# ==========================================
+# CONFIGURATION DYNAMIQUE DES HÔTES DOCKER / LOCAL
+# ==========================================
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "tfc_fraud_db")
 DB_USER = os.getenv("DB_USER", "admin")
@@ -279,7 +280,7 @@ with tab2:
 with tab3:
     st.subheader("Surveillance du Pipeline Événementiel")
     try:
-        # CORRECTION RESEAU : Recherche dynamique du serveur Kafka sur le réseau Docker
+        # Détection dynamique de l'hôte Kafka (Docker ou Local)
         kafka_server = os.getenv("KAFKA_BROKER", "localhost:9092")
         admin = KafkaAdminClient(bootstrap_servers=[kafka_server])
         st.success("Bus Événementiel Apache Kafka : CONNECTÉ (En Ligne)")

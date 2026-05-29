@@ -109,11 +109,11 @@ services:
       - "8001:8001"
     restart: always
 
-  # 7. Robot Simulateur de Flux Mixte (Nouveau !)
+  # 7. Robot Simulateur de Flux Mixte (Corrigé !)
   simulateur_flux:
     build:
       context: .
-      dockerfile: Dockerfile.launcher
+      dockerfile: ./simulateur_flux/Dockerfile
     container_name: fraud_simulator
     restart: on-failure
     depends_on:
