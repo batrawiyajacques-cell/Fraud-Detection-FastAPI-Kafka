@@ -1,5 +1,7 @@
+version: '3.8'
+
 services:
-  # 1. Base de données PostgreSQL
+  # 1. Base de données PostgreSQL avec Initialisation Automatique
   postgres_db:
     image: postgres:15-alpine
     container_name: fraud_postgres
@@ -11,35 +13,37 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d tfc_fraud_db"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # 2. Broker Apache Kafka (Version Confluent KRaft Stable)
-  kafka_broker:
+  # 2. Broker unique Apache Kafka (Configuration KRaft Validée)
+  client:
     image: confluentinc/cp-kafka:7.5.0
-    container_name: fraud_kafka
+    container_name: fraud_kafka_client
     ports:
       - "9092:9092"
     environment:
       KAFKA_NODE_ID: 1
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka_broker:9094,OUTSIDE://localhost:9092
-      KAFKA_LISTENERS: INSIDE://0.0.0.0:9094,OUTSIDE://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka_broker:9093
-      KAFKA_PROCESS_ROLES: broker,controller
-      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@fraud_kafka_client:9093'
+      KAFKA_LISTENERS: 'INSIDE://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'INSIDE://fraud_kafka_client:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'INSIDE:PLAINTEXT,CONTROLLER:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'INSIDE'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
     healthcheck:
       test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 15s
+      start_period: 10s
 
   # 3. API Gateway (FastAPI)
   api_gateway:
@@ -54,11 +58,11 @@ services:
       - DB_NAME=tfc_fraud_db
       - DB_USER=admin
       - DB_PASS=MonSuperPassword2026
-      - KAFKA_BROKER=kafka_broker:9094
+      - KAFKA_BROKER=fraud_kafka_client:9092
     depends_on:
       postgres_db:
         condition: service_healthy
-      kafka_broker:
+      client:
         condition: service_healthy
 
   # 4. Worker de Traitement et Inférence IA (ML Consumer)
@@ -67,23 +71,26 @@ services:
       context: .
       dockerfile: ./ml_consumer/Dockerfile
     container_name: fraud_ml_consumer
+    # 🌟 ATTENTE DE SÉCURITÉ POUR KAFKA
+    entrypoint: ["sh", "-c", "sleep 5 && python worker.py"]
     environment:
       - DB_HOST=postgres_db
       - DB_NAME=tfc_fraud_db
       - DB_USER=admin
       - DB_PASS=MonSuperPassword2026
-      - KAFKA_BROKER=kafka_broker:9094
+      - KAFKA_BROKER=fraud_kafka_client:9092
+      - PYTHONUNBUFFERED=1
     depends_on:
       postgres_db:
         condition: service_healthy
-      kafka_broker:
+      client:
         condition: service_healthy
 
-  # 5. Application de Supervision (Streamlit)
+  # 5. Application de Supervision (Streamlit Dashboard)
   dashboard:
     build:
       context: .
-      dockerfile: ./Dockerfile.dashboard
+      dockerfile: Dockerfile.dashboard
     container_name: fraud_dashboard
     ports:
       - "8501:8501"
@@ -92,11 +99,11 @@ services:
       - DB_NAME=tfc_fraud_db
       - DB_USER=admin
       - DB_PASS=MonSuperPassword2026
-      - KAFKA_BROKER=kafka_broker:9094
+      - KAFKA_BROKER=fraud_kafka_client:9092
     depends_on:
       postgres_db:
         condition: service_healthy
-      kafka_broker:
+      client:
         condition: service_healthy
 
   # 6. Webhook de Réception Banque Partenaire
@@ -109,7 +116,7 @@ services:
       - "8001:8001"
     restart: always
 
-  # 7. Robot Simulateur de Flux Mixte (Variable d'environnement ajoutée)
+  # 7. Robot Simulateur de Flux Mixte (Injecteur de CSV)
   simulateur_flux:
     build:
       context: .
@@ -117,7 +124,7 @@ services:
     container_name: fraud_simulator
     restart: on-failure
     environment:
-      - URL_API=http://api_gateway:8000/v1/transactions
+      - URL_API=http://fraud_api_gateway:8000/v1/transactions
     depends_on:
       api_gateway:
         condition: service_started

@@ -85,13 +85,13 @@ def verifier_authentification_et_role(api_key: str):
 async def recevoir_transaction(transaction: CreditCardPayload, api_key: str = Security(api_key_header)):
     """
     Point de terminaison principal (Endpoint) pour recevoir les transactions des banques.
-    Identifie le rôle du partenaire et aiguille le payload vers le bon Topic Kafka.
+    Identifie le partenaire et pousse le payload vers le canal unique 'Topic_Client'.
     """
     # 1. Authentification dynamique (Récupération de l'ID réel et du rôle)
     id_client, role_client = verifier_authentification_et_role(api_key)
     
-    # 2. Routage dynamique basé sur la classe de service (QoS)
-    topic_destination = "Topic_Premium" if role_client == "Premium" else "Topic_Standard"
+    # 2. Définition du canal unique pour tous les clients
+    topic_destination = "Topic_Client"
     
     # 3. Validation de la disponibilité de Kafka avant l'envoi
     if not producer:
@@ -103,9 +103,9 @@ async def recevoir_transaction(transaction: CreditCardPayload, api_key: str = Se
     try:
         # 4. Préparation et enrichissement dynamique du payload
         payload = transaction.model_dump()
-        payload["id_client"] = id_client  # <-- Corrigé : ID dynamique provenant directement de la BDD !
+        payload["id_client"] = id_client  # ID dynamique provenant directement de la BDD
         
-        # 5. Envoi asynchrone dans le bus de messages
+        # 5. Envoi asynchrone dans le bus de messages unique
         producer.send(topic_destination, value=payload)
         producer.flush()  # Force la transmission immédiate
         

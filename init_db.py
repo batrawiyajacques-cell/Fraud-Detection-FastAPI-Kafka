@@ -1,9 +1,17 @@
 import psycopg2
+import os
 
-DB_URI = "dbname=tfc_fraud_db user=admin password=MonSuperPassword2026 host=localhost port=5432"
+# Récupération dynamique des configurations (avec valeurs par défaut si exécuté en local)
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_NAME = os.getenv("DB_NAME", "tfc_db")  # Assure-toi que cela correspond au POSTGRES_DB de ton .env
+DB_USER = os.getenv("DB_USER", "admin")
+DB_PASS = os.getenv("DB_PASS", "MonSuperPassword2026")
+DB_PORT = os.getenv("DB_PORT", "5432")
+
+DB_URI = f"dbname={DB_NAME} user={DB_USER} password={DB_PASS} host={DB_HOST} port={DB_PORT}"
 
 def initialiser_base_donnees():
-    print("[TFC-DATABASE] Connexion au conteneur PostgreSQL...")
+    print(f"[TFC-DATABASE] Connexion au conteneur PostgreSQL ({DB_HOST} / {DB_NAME})...")
     try:
         conn = psycopg2.connect(DB_URI)
         cursor = conn.cursor()
@@ -23,7 +31,7 @@ def initialiser_base_donnees():
         CREATE TABLE UTILISATEUR (
             id_client INT PRIMARY KEY,
             api_key VARCHAR(64) NOT NULL UNIQUE,
-            role VARCHAR(20) NOT NULL CHECK (role IN ('Premium', 'Standard', 'Admin'))
+            role VARCHAR(20) NOT NULL CHECK (role IN ('Client', 'Admin'))
         );
 
         CREATE TABLE FRAUDE_DETECTOR (
@@ -76,11 +84,10 @@ def initialiser_base_donnees():
             CONSTRAINT fk_audit_transaction FOREIGN KEY (id_trans) REFERENCES TRANSACTION(id_trans) ON DELETE CASCADE
         );
 
-        -- Injection des profils systemes, clients et de l'ADMINISTRATEUR MANUEL
+        -- Injection des profils systemes et de l'ADMINISTRATEUR
         INSERT INTO UTILISATEUR (id_client, api_key, role) VALUES 
         (100, 'admin_master_key_2026', 'Admin'),
-        (1, 'tfc_key_premium_8cf90a32', 'Premium'),
-        (2, 'tfc_key_standard_2b4e78f1', 'Standard') ON CONFLICT DO NOTHING;
+        (1, 'tfc_key_client_8cf90a32', 'Client') ON CONFLICT DO NOTHING;
 
         -- Seuil standard a 0.40 pour correspondre au declenchement de la Zone Grise du Worker
         INSERT INTO FRAUDE_DETECTOR (id_detector, model_name, threshold, is_trained) VALUES 
@@ -89,7 +96,7 @@ def initialiser_base_donnees():
         
         cursor.execute(sql_script)
         conn.commit()
-        print("[TFC-DATABASE] Succes ! Les tables ont ete initialisees avec l'administrateur manuel.")
+        print(f"[TFC-DATABASE] Succes ! Les tables ont ete initialisees dans '{DB_NAME}'.")
         cursor.close()
         conn.close()
         

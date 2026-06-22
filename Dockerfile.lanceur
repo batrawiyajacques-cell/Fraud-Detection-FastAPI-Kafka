@@ -2,13 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# On copie et installe les dépendances nécessaires (comme requests)
+# Copie et installation des dépendances (requests, etc.) - Couche mise en cache
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# On injecte le script de simulation et le fichier de données CSV
+# Injection du script de simulation et du dataset d'évaluation
 COPY lanceur_tfc.py .
 COPY creditcard.csv .
 
-# Commande pour démarrer automatiquement la simulation de flux
+# Commande pour démarrer automatiquement la simulation de flux en continu
 CMD ["python", "lanceur_tfc.py"]
