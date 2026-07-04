@@ -71,7 +71,8 @@ services:
       context: .
       dockerfile: ./ml_consumer/Dockerfile
     container_name: fraud_ml_consumer
-    # 🌟 ATTENTE DE SÉCURITÉ POUR KAFKA
+    
+    #  ATTENTE DE SÉCURITÉ POUR KAFKA
     entrypoint: ["sh", "-c", "sleep 5 && python worker.py"]
     environment:
       - DB_HOST=postgres_db

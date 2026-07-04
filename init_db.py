@@ -3,7 +3,7 @@ import os
 
 # Récupération dynamique des configurations (avec valeurs par défaut si exécuté en local)
 DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "tfc_db")  # Assure-toi que cela correspond au POSTGRES_DB de ton .env
+DB_NAME = os.getenv("DB_NAME", "tfc_db")  
 DB_USER = os.getenv("DB_USER", "admin")
 DB_PASS = os.getenv("DB_PASS", "MonSuperPassword2026")
 DB_PORT = os.getenv("DB_PORT", "5432")
