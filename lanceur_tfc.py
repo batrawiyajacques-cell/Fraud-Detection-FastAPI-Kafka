@@ -52,7 +52,7 @@ if __name__ == "__main__":
         exit(1)
 
     print(f"[TFC] Réserve validée : {len(lignes_normales)} normales et {len(lignes_fraudeuses)} fraudes prêtes.")
-    print("[TFC]  Lancement de l'injection dynamique en temps réel devant le jury...")
+    print("[TFC]  Lancement de l'injection dynamique en temps réel .")
 
     idx_norm = 0
     idx_fraud = 0
